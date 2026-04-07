@@ -26,7 +26,8 @@ async function bundle() {
            /^docs/,
            /^scripts/,
            /^\.git/,
-           /^Shell-Gems-Delivery/,
+           /^Shell-Gems-Delivery($|\/)/,
+           /^Shell-Gems-Delivery\.zip$/,
            /^test-wrapper\.js/,
            /^tsconfig\.json/,
            /^\.vscode/

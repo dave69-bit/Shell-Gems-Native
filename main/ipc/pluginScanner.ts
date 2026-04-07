@@ -11,8 +11,6 @@ export interface PluginInfo {
 }
 
 export function scanPlugins(): PluginInfo[] {
-  // app.getAppPath() in dev points to /dist/main because of how we run `electron dist/main/main.js`
-  // so we need to step back 2 folders or use process.cwd()
   let pluginsDir = path.join(app.getAppPath(), '../../plugins');
   if (app.isPackaged) {
     pluginsDir = path.join(path.dirname(app.getPath('exe')), 'plugins');
@@ -20,6 +18,13 @@ export function scanPlugins(): PluginInfo[] {
   
   const dllsDir = path.join(pluginsDir, 'dlls');
   const iconsDir = path.join(pluginsDir, 'icons');
+  
+  // Debug logging
+  try {
+    const logPath = path.join(app.getPath('userData'), 'plugin-scanner.log');
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] Scanning: ${dllsDir}\n`);
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] Exists: ${fs.existsSync(dllsDir)}\n`);
+  } catch (e) {}
   
   const plugins: PluginInfo[] = [];
 
@@ -34,23 +39,15 @@ export function scanPlugins(): PluginInfo[] {
 
     for (const file of dllFiles) {
       const id = path.parse(file).name;
-      // In a real app we might read assembly attributes, but for now we'll derive the name from the ID
-      // by replacing dashes and capitalizing words.
       const name = id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      
       const iconPathRelative = `plugins/icons/${id}.png`;
       const iconPathAbsolute = path.join(iconsDir, `${id}.png`);
-      
-      // If icon doesn't exist, we still provide the path but maybe UI handling gracefully deals with broken images
-      // Or we can verify it here.
       
       plugins.push({
         id,
         name,
-        // UI expects a path relative to the app root, or we can use absolute file:// protocol in UI.
-        // It's safer to provide a relative path or a specific protocol we handle. Let's provide relative.
         iconPath: fs.existsSync(iconPathAbsolute) ? iconPathRelative : '',
-        status: 'pending' // Actual status will be determined during load/ping
+        status: 'pending'
       });
     }
   } catch (error: any) {
