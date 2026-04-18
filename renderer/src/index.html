@@ -9,5 +9,32 @@
 </head>
 <body>
   <app-root></app-root>
+  <script>
+    // Bridge for WebView2 to simulate the electronAPI
+    if (window.chrome && window.chrome.webview) {
+      window.electronAPI = {
+        invoke: (channel, payload = null) => {
+          const correlationId = Math.random().toString(36).substring(2);
+          return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              window.chrome.webview.removeEventListener('message', listener);
+              reject(new Error(`IPC timeout on channel: ${channel}`));
+            }, 5000);
+
+            const listener = (event) => {
+              const response = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+              if (response.channel === `${channel}:result:${correlationId}`) {
+                clearTimeout(timeout);
+                window.chrome.webview.removeEventListener('message', listener);
+                resolve(response.payload);
+              }
+            };
+            window.chrome.webview.addEventListener('message', listener);
+            window.chrome.webview.postMessage({ channel, correlationId, payload });
+          });
+        }
+      };
+    }
+  </script>
 </body>
 </html>
