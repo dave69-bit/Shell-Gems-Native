@@ -14,7 +14,6 @@ independent tools (DLLs) without those tools needing to know about each other.
 
 ## Portability Requirement
 The app must be **xcopy-deployable**: copy the folder to any Windows machine and run it.
-No .NET 6, no .NET runtime, no internet connection required on the target machine.
 
 ---
 

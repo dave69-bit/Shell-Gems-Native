@@ -35,7 +35,6 @@ The host shell and plugins are written in native C#. The target machine needs .N
   (*Make sure to choose "Run desktop apps" -> Windows x64*)
 - Silent install flag: `/quiet /norestart`
 
-*(Note: You NO LONGER need `VC_redist.x64.exe`. That was a legacy requirement from the abandoned Node.js/Electron implementation system!)*
 
 ### 4. Plugin DLL Files
 The actual plugin DLLs that the app will load.
