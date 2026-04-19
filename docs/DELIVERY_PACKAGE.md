@@ -1,74 +1,65 @@
-﻿# Delivery Package — Offline Installation Bundle
+# Delivery Package — Offline Installation Bundle
 
 ## Goal
-Produce a single folder called `Shell-Gems-Delivery/` that a technician can copy to
-any Windows 10/11 machine (with nothing pre-installed) and run the app with zero internet access.
+Produce a single portable folder called `Shell-Gems-Portable/` that a technician can copy to any Windows 10/11 machine (with nothing pre-installed) and run the app with zero internet access.
 
 ---
 
 ## What Needs to Be Bundled
 
 ### 1. The App Itself
-The .NET/WebView2 portable build output — a self-contained folder, no installer needed.
-Built via: `npm run build:portable` (configured in `scripts/build.js` using `.NET/WebView2-packager`)
-Output folder: `dist/win-unpacked/`
-Rename to: `Shell-Gems/`
+The .NET Native WebView2 build output — a self-contained folder, no installer needed.
+Built via standard `.NET 6 Publish` (`dotnet publish`).
 
-The .NET/WebView2 portable build already bundles:
-- Chromium renderer (no Chrome needed on target)
-- .NET 6 runtime (no .NET 6 needed on target)
-- All npm dependencies (no npm install needed on target)
-- Angular compiled output (no Angular CLI needed on target)
+Output folder: `Shell-Gems-Native/`
 
-### 2. Visual C++ Redistributable (REQUIRED)
-.NET/WebView2 and Native C# Reflection both depend on Visual C++ runtime DLLs.
-On a completely clean Windows machine these are NOT present.
+The portable build bundles:
+- .NET Windows Forms Host executable
+- Angular compiled UI output (placed in `renderer/dist/`)
+- Custom external plugins (placed in `plugins/dlls/`)
 
-- File: `VC_redist.x64.exe`
-- Version: **Visual C++ Redistributable for Visual Studio 2015–2022 (x64)**
-- Download from (on dev machine):
-  https://aka.ms/vs/17/release/vc_redist.x64.exe
-- Size: ~25MB
-- Must be run ONCE on target machine before launching Shell-Gems.exe
+### 2. WebView2 Runtime (REQUIRED)
+The application relies on Microsoft Edge WebView2 to render the Angular frontend. Many modern Windows 10 and all Windows 11 machines have this pre-installed, but it must be included for clean offline environments.
+
+- File: `MicrosoftEdgeWebview2Setup.exe`
+- Version: **WebView2 Evergreen Standalone Installer (x64)**
+- Download from: https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section
+- Silent install flag: `/silent /install`
+
+### 3. .NET Runtime (REQUIRED)
+The host shell and plugins are written in native C#. The target machine needs .NET 6 installed.
+
+- File: `dotnet-runtime-installer.exe` (technically `windowsdesktop-runtime-6.0.xx-win-x64.exe`)
+- Version: **.NET 6.0 Desktop Runtime (Windows x64)** 
+- Download from: https://dotnet.microsoft.com/en-us/download/dotnet/6.0
+  (*Make sure to choose "Run desktop apps" -> Windows x64*)
 - Silent install flag: `/quiet /norestart`
 
-### 3. .NET Runtime (REQUIRED for Native C# Reflection DLL calls)
-Native C# Reflection hosts the CLR to call .NET DLLs. The target machine needs .NET installed.
-
-- File: `dotnet-runtime-installer.exe`
-- Version: **.NET 6.0 Runtime (Windows x64)** — minimum for Native C# Reflection compatibility
-- Download from (on dev machine):
-  https://dotnet.microsoft.com/en-us/download/dotnet/6.0
-  → choose "Run desktop apps" → Windows x64 → .exe installer
-- Size: ~55MB
-- Silent install flag: `/quiet /norestart`
-
-> Note: If your DLL plugins target a specific .NET version (e.g. .NET Framework 4.8
-> instead of .NET 6), replace the above with that version's runtime installer.
-> Confirm with whoever built the DLL plugins.
+*(Note: You NO LONGER need `VC_redist.x64.exe`. That was a legacy requirement from the abandoned Node.js/Electron implementation system!)*
 
 ### 4. Plugin DLL Files
 The actual plugin DLLs that the app will load.
-Place them in: `Shell-Gems/plugins/dlls/`
-Place their icons in: `Shell-Gems/plugins/icons/` (filename must match plugin ID)
+Place compiled `.dll` files in: `Shell-Gems-Native/plugins/dlls/`
+Place their associated icons in: `Shell-Gems-Native/plugins/icons/`
 
 ---
 
 ## Final Delivery Folder Structure
 
 ```
-Shell-Gems-Delivery/
+Shell-Gems-Portable/
 │
-├── Shell-Gems/                        ← The app (copy entire folder to target)
-│   ├── Shell-Gems.exe                 ← Launch this to run the app
-│   ├── plugins/
-│   │   ├── dlls/                      ← Your .dll plugin files go here
-│   │   └── icons/                     ← Plugin icon images
-│   └── (all other .NET/WebView2 files)
+├── Shell-Gems-Native/                 ← The app (copy entire folder to target)
+│   ├── ShellGems.Host.exe             ← Launch this to run the app
+│   ├── renderer/
+│   │   └── dist/                      ← Angular UX web files
+│   └── plugins/
+│       ├── dlls/                      ← Your .dll plugin files go here
+│       └── icons/                     ← Plugin icon images
 │
 ├── prerequisites/                     ← Run these ONCE before first launch
-│   ├── VC_redist.x64.exe              ← Visual C++ Redistributable 2015-2022
-│   └── dotnet-runtime-installer.exe   ← .NET 6.0 Runtime (or required version)
+│   ├── MicrosoftEdgeWebview2Setup.exe ← WebView2 Browser rendering engine
+│   └── dotnet-runtime-installer.exe   ← .NET 6.0 Desktop Runtime
 │
 └── INSTALL.md                         ← Technician instruction file (plain text)
 ```
@@ -79,47 +70,35 @@ Shell-Gems-Delivery/
 
 Run these steps on your development machine before handing off:
 
-```bash
-# Step 1 — Install dependencies
-npm install
+```powershell
+$target = "Shell-Gems-Portable\Shell-Gems-Native"
+
+# Step 1 — Build the Host Shell
+dotnet publish host\ShellGems.Host.csproj -c Release -o "$target"
 
 # Step 2 — Build Angular renderer
-cd renderer
-ng build --configuration production
-cd ..
+Push-Location renderer
+npm install
+npm run build
+Pop-Location
+Copy-Item -Path "renderer\dist" -Destination "$target\renderer\dist" -Recurse -Force
 
-# Step 3 — Build .NET/WebView2 portable package
-npm run build:portable
-# Output: dist/win-unpacked/
+# Step 3 — Compile Plugins
+dotnet publish MockPlugin\MockPlugin.csproj -c Release
+Copy-Item "MockPlugin\bin\Release\net6.0\publish\mock-plugin.dll" "$target\plugins\dlls\" -Force
 
-# Step 4 — Assemble delivery folder
-mkdir Shell-Gems-Delivery
-mkdir Shell-Gems-Delivery\prerequisites
-
-# Copy app
-xcopy dist\win-unpacked Shell-Gems-Delivery\Shell-Gems /E /I
-
-# Copy prerequisites (download these manually first — see above)
-copy VC_redist.x64.exe Shell-Gems-Delivery\prerequisites\
-copy dotnet-runtime-installer.exe Shell-Gems-Delivery\prerequisites\
-
-# Copy instruction file
-copy INSTALL.md Shell-Gems-Delivery\
-
-# Step 5 — Zip it
-# Right-click Shell-Gems-Delivery → Send to → Compressed (zipped) folder
-# Or use 7-Zip: 7z a Shell-Gems-Delivery.zip Shell-Gems-Delivery\
+dotnet publish ChargingMockPlugin\ChargingMockPlugin.csproj -c Release
+Copy-Item "ChargingMockPlugin\bin\Release\net6.0\publish\charging-plugin.dll" "$target\plugins\dlls\" -Force
 ```
 
 ---
 
 ## Checklist Before Handing Off
 
-- [ ] `Shell-Gems.exe` launches correctly on your own machine from the delivery folder
+- [ ] `ShellGems.Host.exe` launches correctly on your own machine
 - [ ] `plugins/dlls/` contains all required .dll files
 - [ ] `plugins/icons/` contains all icon images (matching plugin IDs)
-- [ ] `prerequisites/VC_redist.x64.exe` is present
+- [ ] `prerequisites/MicrosoftEdgeWebview2Setup.exe` is present
 - [ ] `prerequisites/dotnet-runtime-installer.exe` is present and correct version
 - [ ] `INSTALL.md` is in the root of the delivery folder
-- [ ] Tested on at least one clean Windows 10 or 11 VM before delivery
-
+- [ ] Tested on at least one clean Windows VM before delivery
