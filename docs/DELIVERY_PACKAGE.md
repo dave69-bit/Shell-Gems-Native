@@ -1,4 +1,4 @@
-# Delivery Package — Offline Installation Bundle
+﻿# Delivery Package — Offline Installation Bundle
 
 ## Goal
 Produce a single folder called `Shell-Gems-Delivery/` that a technician can copy to
@@ -9,19 +9,19 @@ any Windows 10/11 machine (with nothing pre-installed) and run the app with zero
 ## What Needs to Be Bundled
 
 ### 1. The App Itself
-The Electron portable build output — a self-contained folder, no installer needed.
-Built via: `npm run build:portable` (configured in `scripts/build.js` using `electron-packager`)
+The .NET/WebView2 portable build output — a self-contained folder, no installer needed.
+Built via: `npm run build:portable` (configured in `scripts/build.js` using `.NET/WebView2-packager`)
 Output folder: `dist/win-unpacked/`
 Rename to: `Shell-Gems/`
 
-The Electron portable build already bundles:
+The .NET/WebView2 portable build already bundles:
 - Chromium renderer (no Chrome needed on target)
-- Node.js runtime (no Node.js needed on target)
+- .NET 6 runtime (no .NET 6 needed on target)
 - All npm dependencies (no npm install needed on target)
 - Angular compiled output (no Angular CLI needed on target)
 
 ### 2. Visual C++ Redistributable (REQUIRED)
-Electron and edge-js both depend on Visual C++ runtime DLLs.
+.NET/WebView2 and Native C# Reflection both depend on Visual C++ runtime DLLs.
 On a completely clean Windows machine these are NOT present.
 
 - File: `VC_redist.x64.exe`
@@ -32,11 +32,11 @@ On a completely clean Windows machine these are NOT present.
 - Must be run ONCE on target machine before launching Shell-Gems.exe
 - Silent install flag: `/quiet /norestart`
 
-### 3. .NET Runtime (REQUIRED for edge-js DLL calls)
-edge-js hosts the CLR to call .NET DLLs. The target machine needs .NET installed.
+### 3. .NET Runtime (REQUIRED for Native C# Reflection DLL calls)
+Native C# Reflection hosts the CLR to call .NET DLLs. The target machine needs .NET installed.
 
 - File: `dotnet-runtime-installer.exe`
-- Version: **.NET 6.0 Runtime (Windows x64)** — minimum for edge-js compatibility
+- Version: **.NET 6.0 Runtime (Windows x64)** — minimum for Native C# Reflection compatibility
 - Download from (on dev machine):
   https://dotnet.microsoft.com/en-us/download/dotnet/6.0
   → choose "Run desktop apps" → Windows x64 → .exe installer
@@ -64,7 +64,7 @@ Shell-Gems-Delivery/
 │   ├── plugins/
 │   │   ├── dlls/                      ← Your .dll plugin files go here
 │   │   └── icons/                     ← Plugin icon images
-│   └── (all other Electron files)
+│   └── (all other .NET/WebView2 files)
 │
 ├── prerequisites/                     ← Run these ONCE before first launch
 │   ├── VC_redist.x64.exe              ← Visual C++ Redistributable 2015-2022
@@ -88,7 +88,7 @@ cd renderer
 ng build --configuration production
 cd ..
 
-# Step 3 — Build Electron portable package
+# Step 3 — Build .NET/WebView2 portable package
 npm run build:portable
 # Output: dist/win-unpacked/
 
@@ -122,3 +122,4 @@ copy INSTALL.md Shell-Gems-Delivery\
 - [ ] `prerequisites/dotnet-runtime-installer.exe` is present and correct version
 - [ ] `INSTALL.md` is in the root of the delivery folder
 - [ ] Tested on at least one clean Windows 10 or 11 VM before delivery
+

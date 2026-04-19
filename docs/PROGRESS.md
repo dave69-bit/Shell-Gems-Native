@@ -1,4 +1,4 @@
-# Progress Tracker
+﻿# Progress Tracker
 
 ## Current Status
 🔄 **Rebuild in progress**. Multi-function plugin support implemented across IPC and UI layers. Final integration testing pending.
@@ -10,14 +10,14 @@
 | Date | Decision | Reason |
 |------|----------|--------|
 | (start) | Use Angular instead of React | Requested by design spec |
-| (start) | No separate backend process | All DLL logic moves to Electron main process |
+| (start) | No separate backend process | All DLL logic moves to .NET Windows Forms application |
 | (start) | IPC replaces HTTP/REST | No localhost server needed, cleaner architecture |
-| (start) | `contextBridge` with whitelist | Secure Electron pattern, `nodeIntegration: false` |
+| (start) | `WebView2 Interop` with whitelist | Secure .NET/WebView2 pattern, `nodeIntegration: false` |
 | (start) | File passed as Base64 string | Keeps file handling in renderer (File API), no fs over IPC |
 | (start) | Portable build (no installer) | Offline + xcopy-deployable requirement |
-| (start) | `edge-js` for DLL interop | Hosts CLR inside Node.js, no separate .NET process |
+| (start) | `Native C# Reflection` for DLL interop | Hosts CLR inside .NET 6, no separate .NET process |
 | (start) | Target Windows 10 + 11, clean machines | Widest compatibility, assume nothing pre-installed |
-| (start) | Bundle VC++ Redist + .NET 6 Runtime in delivery folder | edge-js requires both on clean machines |
+| (start) | Bundle VC++ Redist + .NET 6 Runtime in delivery folder | Native C# Reflection requires both on clean machines |
 | (redesign) | Multi-function plugin model | Each plugin exposes N named functions, each with own params + JSON result |
 | (redesign) | Reflection dispatch inside DLL | Shell passes functionName; DLL routes via BindingFlags.NonPublic reflection |
 | (redesign) | Result as opaque JSON viewer | Shell never interprets result keys — DLL author owns result shape |
@@ -29,20 +29,20 @@
 ---
 
 ## Phase 1 — Project Scaffolding
-- [x] Initialize root `package.json` with Electron + Electron Builder deps
+- [x] Initialize root `package.json` with .NET WebView2 + MSBuild deps
 - [x] Scaffold Angular app in `/renderer` using Angular CLI
 - [x] Configure Angular to output into `renderer/dist/`
 - [x] Create `main/main.ts`
-- [x] Create `main/preload.ts` with updated channel whitelist:
+- [x] Create `main/MainForm.cs` with updated channel whitelist:
       `plugins:list`, `plugins:functions`, `plugins:params`, `plugins:execute`
-- [x] Verify Electron opens Angular app in a BrowserWindow
+- [x] Verify .NET/WebView2 opens Angular app in a BrowserWindow
 - [x] Configure `scripts/build.js` for portable build
 - [x] Confirm `plugins/` folder copies into build output
 
 ## Phase 2 — Main Process IPC Layer
 - [x] Create / update `main/ipc/pluginScanner.ts` — scans `plugins/dlls/`
 - [x] Create / update `main/ipc/pluginLoader.ts`:
-  - [x] Load DLL via `edge-js`
+  - [x] Load DLL via `Native C# Reflection`
   - [x] Call `DLL.GetFunctions()` → return function manifest
   - [x] Call `DLL.GetParams({ functionName })` → return param schema
   - [x] Call `DLL.Execute({ functionName, parameters })` → return result object
@@ -122,3 +122,4 @@
 
 ## Known Issues / Blockers
 _None — update this section as you work._
+

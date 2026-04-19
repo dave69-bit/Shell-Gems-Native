@@ -1,8 +1,8 @@
-# API Contract — Angular Renderer ↔ Electron Main (IPC)
+﻿# API Contract — Angular Renderer ↔ .NET/WebView2 Main (IPC)
 
 ## Overview
 There is no HTTP server. All communication between the Angular UI and the DLL layer
-uses Electron's IPC mechanism via the `contextBridge`.
+uses WebView2 WebMessage mechanism via the `WebView2 Interop`.
 
 Each plugin can expose **multiple named functions**. Each function declares its own
 parameter schema and returns a JSON result. The Shell selects the function first,
@@ -13,13 +13,13 @@ dispatch internally via reflection.
 
 ```typescript
 // In any Angular service:
-const plugins   = await window.electronAPI.invoke('plugins:list');
-const functions = await window.electronAPI.invoke('plugins:functions', { pluginId: 'my-plugin' });
-const params    = await window.electronAPI.invoke('plugins:params',    { pluginId: 'my-plugin', functionName: 'Compress' });
-const result    = await window.electronAPI.invoke('plugins:execute',   { pluginId: 'my-plugin', functionName: 'Compress', params: { ... } });
+const plugins   = await window.chrome.webview.invoke('plugins:list');
+const functions = await window.chrome.webview.invoke('plugins:functions', { pluginId: 'my-plugin' });
+const params    = await window.chrome.webview.invoke('plugins:params',    { pluginId: 'my-plugin', functionName: 'Compress' });
+const result    = await window.chrome.webview.invoke('plugins:execute',   { pluginId: 'my-plugin', functionName: 'Compress', params: { ... } });
 ```
 
-**Rule:** Never call `window.electronAPI` from a component. Always use a service.
+**Rule:** Never call `window.chrome.webview` from a component. Always use a service.
 
 ---
 
@@ -228,7 +228,7 @@ Replaces the former `plugins:update` channel.
 ## DLL Contract — What the Plugin Must Implement
 
 Every plugin DLL must expose a class with three **public** async methods whose signatures
-are dictated by `edge-js` (`Task<object> Method(dynamic input)`). Each public method
+are dictated by `Native C# Reflection` (`Task<object> Method(dynamic input)`). Each public method
 is kept as thin as possible — it unpacks the `dynamic` payload immediately and delegates
 to a clean private method with an explicit, typed signature. No `dynamic` propagates
 beyond the public boundary.
@@ -241,7 +241,7 @@ Returns the function manifest — the list of functions the plugin exposes.
 `dynamic input` is unused; the method is parameterless in practice.
 
 ```csharp
-// edge-js entry point — thin wrapper
+// Native C# Reflection entry point — thin wrapper
 public async Task<object> GetFunctions(dynamic input)
 {
     return await GetFunctions();
@@ -271,7 +271,7 @@ private async Task<object> GetFunctions()
 Returns the parameter schema for a specific function name.
 
 ```csharp
-// edge-js entry point — unpacks dynamic immediately
+// Native C# Reflection entry point — unpacks dynamic immediately
 public async Task<object> GetParams(dynamic input)
 {
     string functionName = (string)input.functionName;
@@ -311,7 +311,7 @@ Dispatches to the correct private function method by name using reflection.
 Returns a JSON-serializable result object.
 
 ```csharp
-// edge-js entry point — unpacks dynamic immediately
+// Native C# Reflection entry point — unpacks dynamic immediately
 public async Task<object> Execute(dynamic input)
 {
     string functionName                    = (string)input.functionName;
@@ -335,7 +335,7 @@ private async Task<object> Execute(string functionName, IDictionary<string, obje
 
 // ── Private function implementations ────────────────────────────────────────
 // Each function receives a clean IDictionary — no dynamic anywhere below this line.
-// Cast values to the expected type; edge-js maps JS types as follows:
+// Cast values to the expected type; Native C# Reflection maps JS types as follows:
 //   JS number  → int or double   JS boolean → bool   JS string → string
 
 private async Task<object> Compress(IDictionary<string, object> parameters)
@@ -376,7 +376,7 @@ private async Task<object> ExtractMetadata(IDictionary<string, object> parameter
 
 | Layer | Signature | Responsibility |
 |-------|-----------|----------------|
-| Public (edge-js boundary) | `Task<object> Method(dynamic input)` | Unpack `dynamic`, cast to typed values, delegate — nothing else |
+| Public (Native C# Reflection boundary) | `Task<object> Method(dynamic input)` | Unpack `dynamic`, cast to typed values, delegate — nothing else |
 | Private dispatcher | `Task<object> Execute(string, IDictionary<string, object>)` | Route by function name via reflection |
 | Private functions | `Task<object> FunctionName(IDictionary<string, object>)` | Business logic — cast params, do work, return result object |
 
@@ -446,10 +446,10 @@ The user clicks it and the browser saves the file using the provided `filename`.
 This is the most important `_meta` format hint to include whenever a function returns file content.
 
 ```typescript
-// preload.ts
-import { contextBridge, ipcRenderer } from 'electron';
+// MainForm.cs
+import { WebView2 Interop, ipcRenderer } from '.NET/WebView2';
 
-contextBridge.exposeInMainWorld('electronAPI', {
+WebView2 Interop.exposeInMainWorld('electronAPI', {
   invoke: (channel: string, payload?: unknown) => {
     const allowed = [
       'plugins:list',
@@ -501,3 +501,4 @@ plugins:list
                                              └─► plugins:execute
                                                       └─► JSON result displayed in panel
 ```
+

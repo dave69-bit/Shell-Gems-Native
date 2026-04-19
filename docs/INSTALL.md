@@ -1,4 +1,4 @@
-# Shell-Gems — Installation Guide for Technicians
+﻿# Shell-Gems — Installation Guide for Technicians
 
 **Application:** Shell-Gems
 **Delivery type:** Portable (no installer — copy and run)
@@ -127,3 +127,4 @@ The app is fully portable. To move it:
 
 ### Nothing happens when double-clicking ShellGems.Host.exe
 - Check that you are running 64-bit Windows
+

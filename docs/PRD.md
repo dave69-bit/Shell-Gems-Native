@@ -1,4 +1,4 @@
-# PRD — Product Requirements Document
+﻿# PRD — Product Requirements Document
 
 ## What We Are Building
 A portable desktop application called **Shell-Plugin**.
@@ -14,7 +14,7 @@ independent tools (DLLs) without those tools needing to know about each other.
 
 ## Portability Requirement
 The app must be **xcopy-deployable**: copy the folder to any Windows machine and run it.
-No Node.js, no .NET runtime, no internet connection required on the target machine.
+No .NET 6, no .NET runtime, no internet connection required on the target machine.
 
 ---
 
@@ -110,3 +110,4 @@ Switching function tabs resets the form to the new function's default values.
 - Dropping a new DLL in `/plugins/dlls/` and restarting the app shows it in the grid
 - Adding a new function to an existing DLL (without Shell changes) makes it appear in the function selector on next restart
 - The entire app folder can be copied to a new machine and run without any setup
+

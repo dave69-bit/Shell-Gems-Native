@@ -1,4 +1,4 @@
-# UI/UX Design Guidelines
+﻿# UI/UX Design Guidelines
 
 ## Design Philosophy
 The Shell should feel like a **mobile home screen on a desktop**.
@@ -353,3 +353,4 @@ ngx-json-viewer {
 | Tree node expand/collapse | Chevron rotates 90°, 150ms |
 | Skeleton | Shimmer sweep, infinite loop |
 | Copy JSON confirm | "✓ Copied" text for 1.5s then resets |
+

@@ -1,23 +1,23 @@
-# Architecture
+﻿# Architecture
 
 ## Why Angular Can't Call DLLs Directly
-Angular runs inside Electron's **Renderer process** — a sandboxed Chromium browser context.
+Angular runs inside WebView2's browser context — a sandboxed Chromium browser context.
 Browser sandboxes have no access to the OS, filesystem, or native libraries by design.
-DLL calls require Node.js APIs (`require`, native modules) which are only available in the
+DLL calls require .NET 6 APIs (`require`, native modules) which are only available in the
 **Main process**. The solution is IPC: Angular sends a message, Main calls the DLL, returns the result.
 
 ## System Overview
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                        ELECTRON APP (one process tree)               │
+│                        .NET/WebView2 APP (one process tree)               │
 │                                                                      │
 │  ┌─────────────────────────────┐      ┌───────────────────────────┐  │
 │  │     RENDERER PROCESS        │      │       MAIN PROCESS        │  │
-│  │     (Angular UI)            │      │       (Node.js)           │  │
+│  │     (Angular UI)            │      │       (.NET 6)           │  │
 │  │                             │ IPC  │                           │  │
 │  │  - Plugin grid              │◄────►│  - Scans plugins/dlls/    │  │
-│  │  - Function selector        │      │  - Loads DLLs via edge-js │  │
+│  │  - Function selector        │      │  - Loads DLLs via Native C# Reflection │  │
 │  │  - Side panel               │      │  - Handles IPC channels   │  │
 │  │  - Dynamic form controls    │      │  - File system access     │  │
 │  │  - JSON result viewer       │      │  - Reflection dispatch    │  │
@@ -35,11 +35,11 @@ DLL calls require Node.js APIs (`require`, native modules) which are only availa
 | Layer | Technology | Reason |
 |-------|-----------|--------|
 | UI Framework | Angular (latest stable) | Component architecture, two-way binding for dynamic forms |
-| Desktop Shell | Electron | Exposes Node.js APIs to a web UI |
-| DLL Interop | `edge-js` | Loads and calls .NET DLLs from Node.js main process |
-| IPC Bridge | Electron `contextBridge` + `ipcMain` | Secure renderer↔main communication |
+| Desktop Shell | .NET/WebView2 | Exposes .NET 6 APIs to a web UI |
+| DLL Interop | `Native C# Reflection` | Loads and calls .NET DLLs from .NET 6 main process |
+| IPC Bridge | .NET/WebView2 `WebView2 Interop` + `CoreWebView2` | Secure renderer↔main communication |
 | Styling | SCSS + CSS Grid | Responsive layout, scoped styles per component |
-| Bundler | Angular CLI + Electron Builder | Single portable output folder |
+| Bundler | Angular CLI + .NET 6 Publish | Single portable output folder |
 
 ## Plugin Model
 
@@ -49,12 +49,12 @@ how to display the JSON result it returns.
 
 The DLL has two distinct layers:
 
-**Public layer (edge-js boundary):** Three methods with the mandatory `Task<object> Method(dynamic input)` signature. Each is a thin wrapper that unpacks the `dynamic` payload and immediately delegates to the private layer. No logic lives here.
+**Public layer (Native C# Reflection boundary):** Three methods with the mandatory `Task<object> Method(dynamic input)` signature. Each is a thin wrapper that unpacks the `dynamic` payload and immediately delegates to the private layer. No logic lives here.
 
 **Private layer (no dynamic):** Clean, typed methods with explicit signatures. All business logic, parameter casting, and reflection dispatch live here.
 
 ```
-Plugin DLL — Public surface (edge-js boundary)
+Plugin DLL — Public surface (Native C# Reflection boundary)
 ├── GetFunctions(dynamic)  →  delegates → GetFunctions()
 ├── GetParams(dynamic)     →  unpacks functionName → GetParams(string)
 └── Execute(dynamic)       →  unpacks functionName + parameters
@@ -80,12 +80,12 @@ Angular Component
       │
       ▼
 Angular Service (e.g. PluginService)
-      │  calls window.electronAPI.invoke('channel:name', payload)
+      │  calls window.chrome.webview.invoke('channel:name', payload)
       ▼
-preload.ts  (contextBridge exposes electronAPI)
+MainForm.cs  (WebView2 Interop exposes electronAPI)
       │
       ▼
-main/ipc/handlers.ts  (ipcMain.handle)
+main/ipc/handlers.ts  (CoreWebView2.WebMessageReceived)
       │
       ├── plugins:list       → pluginScanner.ts
       ├── plugins:functions  → pluginLoader.ts → DLL.GetFunctions()
@@ -96,7 +96,7 @@ main/ipc/handlers.ts  (ipcMain.handle)
                                                           to call internal method
 ```
 
-**Rule:** Angular components never call `window.electronAPI` directly.
+**Rule:** Angular components never call `window.chrome.webview` directly.
 They always go through an Angular service. This keeps components testable and decoupled.
 
 ## User Interaction Flow
@@ -140,12 +140,12 @@ shell-plugin/
 │
 ├── main/
 │   ├── main.ts
-│   ├── preload.ts
+│   ├── MainForm.cs
 │   └── ipc/
 │       ├── pluginScanner.ts     ← Scans plugins/dlls/ on startup
-│       ├── pluginLoader.ts      ← Loads DLLs via edge-js; calls GetFunctions,
+│       ├── pluginLoader.ts      ← Loads DLLs via Native C# Reflection; calls GetFunctions,
 │       │                           GetParams, Execute on the DLL
-│       └── handlers.ts          ← Registers all ipcMain.handle channels:
+│       └── handlers.ts          ← Registers all CoreWebView2.WebMessageReceived channels:
 │                                   plugins:list, plugins:functions,
 │                                   plugins:params, plugins:execute
 │
@@ -158,7 +158,7 @@ shell-plugin/
 │           ├── app.module.ts
 │           ├── app.component.ts
 │           ├── services/
-│           │   ├── plugin.service.ts    ← Wraps all window.electronAPI calls
+│           │   ├── plugin.service.ts    ← Wraps all window.chrome.webview calls
 │           │   └── file.service.ts      ← File reading + Base64 encoding
 │           └── components/
 │               ├── plugin-grid/         ← Home screen icon grid
@@ -181,12 +181,12 @@ shell-plugin/
 
 ## Portability Design
 
-The app is built as a **self-contained portable package** using Electron Builder:
+The app is built as a **self-contained portable package** using .NET 6 Publish:
 
 - Output: a single folder (`dist/win-unpacked/`) that can be zipped and copied anywhere
 - No installer required — just run `ShellPlugin.exe`
 - All Node modules bundled — no `npm install` needed on target
-- No .NET runtime needed — `edge-js` bundles the CLR host
+- No .NET runtime needed — `Native C# Reflection` bundles the CLR host
 - All paths resolved via `app.getAppPath()` — never hardcoded
 - `plugins/` folder is copied into the dist output and resolved at runtime
 
@@ -199,23 +199,23 @@ The app is built as a **self-contained portable package** using Electron Builder
 ## Key Design Decisions
 
 ### No Separate Backend Process
-All logic lives in Electron's main process.
+All logic lives in the .NET WebView2 Host app.
 This eliminates the need to manage a separate server process, port conflicts, or startup ordering.
 
-### contextBridge (not nodeIntegration)
-`nodeIntegration: false` is enforced. Angular accesses Node.js only through the
-whitelisted `contextBridge` API defined in `preload.ts`.
+### WebView2 Interop (not nodeIntegration)
+`nodeIntegration: false` is enforced. Angular accesses .NET 6 only through the
+whitelisted `WebView2 Interop` API defined in `MainForm.cs`.
 
-### edge-js for DLL Interop
-`edge-js` is the most reliable way to call .NET DLLs from Node.js without a separate process.
-It hosts the CLR inside the Node.js process. Called only from the main process.
+### Native C# Reflection for DLL Interop
+`Native C# Reflection` is the most reliable way to call .NET DLLs from .NET 6 without a separate process.
+It hosts the CLR inside the .NET 6 process. Called only from the main process.
 
 ### Reflection-Based Dispatch Inside the DLL
 The Shell does not need to know anything about what a function does.
 It passes `{ functionName, params }` to `Execute()` and the DLL uses
 `BindingFlags.NonPublic | BindingFlags.Instance` reflection to route to the right method.
 
-The DLL uses a two-layer design to keep `dynamic` contained at the edge-js boundary:
+The DLL uses a two-layer design to keep `dynamic` contained at the Native C# Reflection boundary:
 - Public methods (`dynamic input`) unpack the payload and immediately delegate — no logic
 - Private methods use typed signatures (`string`, `IDictionary<string, object>`) — all logic lives here
 
@@ -238,3 +238,4 @@ encoded to Base64, and passed to the DLL as a string. Decoding is the DLL's resp
 
 ## Port Configuration
 No port needed — IPC replaces HTTP. There is no localhost server.
+

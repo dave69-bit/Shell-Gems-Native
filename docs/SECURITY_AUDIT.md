@@ -1,4 +1,4 @@
-# Security Audit Report — Shell-Gems
+﻿# Security Audit Report — Shell-Gems
 **Date:** 2026-03-31
 
 ---
@@ -7,36 +7,36 @@
 
 | Location | Total | Info | Low | Moderate | High | Critical |
 |----------|-------|------|-----|----------|------|----------|
-| Root (Electron / Main process) | **9** | 0 | 2 | 1 | 6 | 0 |
+| Root (.NET/WebView2 / Main process) | **9** | 0 | 2 | 1 | 6 | 0 |
 | Renderer (Angular) | **48** | 0 | 6 | 10 | 32 | 0 |
 
 > **IMPORTANT:**
 > **Zero vulnerabilities are from code we own or voluntarily chose.**
-> Every single finding is in a **dev-only toolchain package** (build tools, bundlers, test runners) or a deeply transitive dependency of `electron-rebuild` which is itself only used during development. None of these packages are shipped inside `Shell-Gems.exe`.
+> Every single finding is in a **dev-only toolchain package** (build tools, bundlers, test runners) or a deeply transitive dependency of `.NET/WebView2-rebuild` which is itself only used during development. None of these packages are shipped inside `Shell-Gems.exe`.
 
 ---
 
 ## Root Package (`package.json`)
 
-### 9 vulnerabilities — all inside `electron-rebuild` dev dep
+### 9 vulnerabilities — all inside `.NET/WebView2-rebuild` dev dep
 
-`electron-rebuild` is only used during development to recompile native modules (`electron-edge-js`) for the right Electron ABI. It is **not bundled** into the portable build output.
+`.NET/WebView2-rebuild` is only used during development to recompile native modules (`.NET/WebView2-Native C# Reflection`) for the right .NET/WebView2 ABI. It is **not bundled** into the portable build output.
 
 | Package | Severity | Issue | Fix path |
 |---------|----------|-------|----------|
-| `@tootallnate/once` | Low | Incorrect control flow scoping | Transitive of `electron-rebuild` |
-| `@tootallnate/once` | Low | Hash collisions on macOS APFS | Transitive of `electron-rebuild` |
-| `make-fetch-happen` | Moderate | SSRF + cache persistence | Transitive of `electron-rebuild` → `node-gyp` |
-| `tar` ≤7.5.3 | High | Arbitrary file creation/overwrite via hardlink | Inside `electron-rebuild/node_modules/tar` |
-| `tar` ≤7.5.9 | High | Symlink path traversal via drive-relative linkpath | Inside `electron-rebuild/node_modules/tar` |
-| `tar` ≤7.5.10 | High | Race condition in path reservations via Unicode ligature | Inside `electron-rebuild/node_modules/tar` |
-| `cacache` 14–18 | High | Depends on vulnerable `tar` | Inside `electron-rebuild/node_modules/cacache` |
-| `node-gyp` | High | Depends on vulnerable `cacache` | Inside `electron-rebuild/node_modules/node-gyp` |
-| `electron-rebuild` ≥1.5.0 | High | Depends on all the above | Top of the chain |
+| `@tootallnate/once` | Low | Incorrect control flow scoping | Transitive of `.NET/WebView2-rebuild` |
+| `@tootallnate/once` | Low | Hash collisions on macOS APFS | Transitive of `.NET/WebView2-rebuild` |
+| `make-fetch-happen` | Moderate | SSRF + cache persistence | Transitive of `.NET/WebView2-rebuild` → `node-gyp` |
+| `tar` ≤7.5.3 | High | Arbitrary file creation/overwrite via hardlink | Inside `.NET/WebView2-rebuild/node_modules/tar` |
+| `tar` ≤7.5.9 | High | Symlink path traversal via drive-relative linkpath | Inside `.NET/WebView2-rebuild/node_modules/tar` |
+| `tar` ≤7.5.10 | High | Race condition in path reservations via Unicode ligature | Inside `.NET/WebView2-rebuild/node_modules/tar` |
+| `cacache` 14–18 | High | Depends on vulnerable `tar` | Inside `.NET/WebView2-rebuild/node_modules/cacache` |
+| `node-gyp` | High | Depends on vulnerable `cacache` | Inside `.NET/WebView2-rebuild/node_modules/node-gyp` |
+| `.NET/WebView2-rebuild` ≥1.5.0 | High | Depends on all the above | Top of the chain |
 
-**Fix available:** `npm audit fix --force` → upgrades `electron-rebuild` to `2.0.3` (breaking change).
+**Fix available:** `npm audit fix --force` → upgrades `.NET/WebView2-rebuild` to `2.0.3` (breaking change).
 
-**Risk to users: NONE.** `electron-rebuild` never runs on end-user machines. It only executes on a developer's machine during the build.
+**Risk to users: NONE.** `.NET/WebView2-rebuild` never runs on end-user machines. It only executes on a developer's machine during the build.
 
 ---
 
@@ -75,8 +75,8 @@ The renderer vulnerabilities fall into two buckets:
 
 The contents of `dist/win-unpacked/resources/app/` at runtime include only:
 - `renderer/dist/renderer/browser/` — **compiled, minified JS/CSS. No dev tools.**
-- `dist/main/` — **compiled Electron main process TS.**
-- `node_modules/electron-edge-js/` — our sole runtime native dependency.
+- `dist/main/` — **compiled .NET Windows Forms application TS.**
+- `node_modules/.NET/WebView2-Native C# Reflection/` — our sole runtime native dependency.
 - `plugins/` — the DLL files.
 
 None of the flagged packages above are present in the packaged output.
@@ -96,21 +96,21 @@ npm install @angular/core@latest @angular/common@latest @angular/forms@latest @a
 
 This resolves the Angular XSRF issue and upgrades the entire build toolchain in one shot. Test the build afterwards with `npm run build`.
 
-### Option 2 — Upgrade electron-rebuild (low priority)
+### Option 2 — Upgrade .NET/WebView2-rebuild (low priority)
 
 ```powershell
 # In root/
-npm install electron-rebuild@2.0.3 --save-dev
+npm install .NET/WebView2-rebuild@2.0.3 --save-dev
 ```
 
 Resolves the `tar`/`cacache`/`node-gyp` chain. Low priority because it only affects the developer machine.
 
-### Option 3 — Remove `electron-rebuild` entirely (aggressive)
+### Option 3 — Remove `.NET/WebView2-rebuild` entirely (aggressive)
 
 If you are not rebuilding native modules anymore (the `.dll` is already compiled), you can remove it:
 
 ```powershell
-npm uninstall electron-rebuild --save-dev
+npm uninstall .NET/WebView2-rebuild --save-dev
 ```
 
 This reduces root vulnerabilities from **9 → 0** immediately.
@@ -120,4 +120,5 @@ This reduces root vulnerabilities from **9 → 0** immediately.
 ## Verdict
 
 **No vulnerabilities affect the shipped application or end users.** 
-All 57 findings (9 root + 48 renderer) are confined to **developer-only build tooling** that never runs on target machines. The only user-facing code — the Angular bundle + Electron main process — is clean.
+All 57 findings (9 root + 48 renderer) are confined to **developer-only build tooling** that never runs on target machines. The only user-facing code — the Angular bundle + .NET Windows Forms application — is clean.
+
