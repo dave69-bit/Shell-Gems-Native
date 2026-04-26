@@ -1,9 +1,9 @@
-﻿# Architecture
+# Architecture
 
 ## Why Angular Can't Call DLLs Directly
 Angular runs inside WebView2's browser context — a sandboxed Chromium browser context.
 Browser sandboxes have no access to the OS, filesystem, or native libraries by design.
-DLL calls require .NET 6 APIs (`require`, native modules) which are only available in the
+DLL calls require .NET 8.0 APIs (`require`, native modules) which are only available in the
 **Main process**. The solution is IPC: Angular sends a message, Main calls the DLL, returns the result.
 
 ## System Overview
@@ -14,7 +14,7 @@ DLL calls require .NET 6 APIs (`require`, native modules) which are only availab
 │                                                                      │
 │  ┌─────────────────────────────┐      ┌───────────────────────────┐  │
 │  │     RENDERER PROCESS        │      │       MAIN PROCESS        │  │
-│  │     (Angular UI)            │      │       (.NET 6)           │  │
+│  │     (Angular UI)            │      │       (.NET 8.0)           │  │
 │  │                             │ IPC  │                           │  │
 │  │  - Plugin grid              │◄────►│  - Scans plugins/dlls/    │  │
 │  │  - Function selector        │      │  - Loads DLLs via Native C# Reflection │  │
@@ -34,12 +34,12 @@ DLL calls require .NET 6 APIs (`require`, native modules) which are only availab
 
 | Layer | Technology | Reason |
 |-------|-----------|--------|
-| UI Framework | Angular (latest stable) | Component architecture, two-way binding for dynamic forms |
-| Desktop Shell | .NET/WebView2 | Exposes .NET 6 APIs to a web UI |
-| DLL Interop | `Native C# Reflection` | Loads and calls .NET DLLs from .NET 6 main process |
+| UI Framework | Angular 18.2.9 | Component architecture, two-way binding for dynamic forms |
+| Desktop Shell | .NET/WebView2 | Exposes .NET 8.0 APIs to a web UI |
+| DLL Interop | `Native C# Reflection` | Loads and calls .NET DLLs from .NET 8.0 main process |
 | IPC Bridge | .NET/WebView2 `WebView2 Interop` + `CoreWebView2` | Secure renderer↔main communication |
 | Styling | SCSS + CSS Grid | Responsive layout, scoped styles per component |
-| Bundler | Angular CLI + .NET 6 Publish | Single portable output folder |
+| Bundler | Angular CLI + .NET 8.0 Publish | Single portable output folder |
 
 ## Plugin Model
 
@@ -125,7 +125,7 @@ The side panel is divided into three regions:
 ## Folder Structure
 
 ```
-shell-plugin/
+shell-gems/
 │
 ├── CLAUDE.md
 ├── docs/
@@ -135,53 +135,38 @@ shell-plugin/
 │   ├── UI.md
 │   └── PROGRESS.md
 │
-├── package.json
-├── scripts/build.js
+├── host/                        ← .NET 8.0 WinForms Host
+│   ├── Program.cs               ← App entry point
+│   ├── MainForm.cs              ← WebView2 configuration + IPC handlers
+│   ├── PluginManager.cs         ← Scans plugins/dlls and loads via Reflection
+│   ├── ShellGems.Host.csproj
+│   └── appsettings.json
 │
-├── main/
-│   ├── main.ts
-│   ├── MainForm.cs
-│   └── ipc/
-│       ├── pluginScanner.ts     ← Scans plugins/dlls/ on startup
-│       ├── pluginLoader.ts      ← Loads DLLs via Native C# Reflection; calls GetFunctions,
-│       │                           GetParams, Execute on the DLL
-│       └── handlers.ts          ← Registers all CoreWebView2.WebMessageReceived channels:
-│                                   plugins:list, plugins:functions,
-│                                   plugins:params, plugins:execute
-│
-├── renderer/
-│   ├── angular.json
+├── renderer/                    ← Angular Frontend (v18.2.9)
+│   ├── angular.json             ← Uses Webpack-based 'browser' builder
+│   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
 │       ├── main.ts
 │       └── app/
-│           ├── app.module.ts
 │           ├── app.component.ts
 │           ├── services/
-│           │   ├── plugin.service.ts    ← Wraps all window.chrome.webview calls
+│           │   ├── plugin.service.ts    ← Wraps window.chrome.webview.postMessage
 │           │   └── file.service.ts      ← File reading + Base64 encoding
 │           └── components/
 │               ├── plugin-grid/         ← Home screen icon grid
-│               ├── plugin-icon/         ← Single icon card + status dot
 │               ├── side-panel/          ← Sliding drawer (hosts all 3 regions)
-│               ├── function-selector/   ← NEW: tab/list of functions for a plugin
 │               ├── dynamic-form/        ← Builds controls from param schema
-│               ├── result-viewer/       ← NEW: formatted JSON output display
-│               └── controls/
-│                   ├── text-control/
-│                   ├── number-control/
-│                   ├── boolean-control/
-│                   ├── range-control/
-│                   └── file-control/
+│               └── result-viewer/       ← Formatted JSON output display
 │
-└── plugins/
+└── plugins/                     ← Plugin deployment area
     ├── dlls/
     └── icons/
 ```
 
 ## Portability Design
 
-The app is built as a **self-contained portable package** using .NET 6 Publish:
+The app is built as a **self-contained portable package** using .NET 8.0 Publish:
 
 - Output: a single folder (`dist/win-unpacked/`) that can be zipped and copied anywhere
 - No installer required — just run `ShellPlugin.exe`

@@ -1,0 +1,6 @@
+{
+  "name": "vite",
+  "version": "99.9.9",
+  "description": "Offline no-op substitute for vite",
+  "main": "index.js"
+}

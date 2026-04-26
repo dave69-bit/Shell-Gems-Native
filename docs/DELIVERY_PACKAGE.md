@@ -27,11 +27,11 @@ The application relies on Microsoft Edge WebView2 to render the Angular frontend
 - Silent install flag: `/silent /install`
 
 ### 3. .NET Runtime (REQUIRED)
-The host shell and plugins are written in native C#. The target machine needs .NET 6 installed.
+The host shell and plugins are written in native C#. The target machine needs .NET 8 installed.
 
-- File: `dotnet-runtime-installer.exe` (technically `windowsdesktop-runtime-6.0.xx-win-x64.exe`)
-- Version: **.NET 6.0 Desktop Runtime (Windows x64)** 
-- Download from: https://dotnet.microsoft.com/en-us/download/dotnet/6.0
+- File: `dotnet-runtime-installer.exe` (technically `windowsdesktop-runtime-8.0.xx-win-x64.exe`)
+- Version: **.NET 8.0 Desktop Runtime (Windows x64)** 
+- Download from: https://dotnet.microsoft.com/en-us/download/dotnet/8.0
   (*Make sure to choose "Run desktop apps" -> Windows x64*)
 - Silent install flag: `/quiet /norestart`
 
@@ -58,16 +58,16 @@ Shell-Gems-Portable/
 │
 ├── prerequisites/                     ← Run these ONCE before first launch
 │   ├── MicrosoftEdgeWebview2Setup.exe ← WebView2 Browser rendering engine
-│   └── dotnet-runtime-installer.exe   ← .NET 6.0 Desktop Runtime
+│   └── dotnet-runtime-installer.exe   ← .NET 8.0 Desktop Runtime
 │
 └── INSTALL.md                         ← Technician instruction file (plain text)
 ```
 
 ---
 
-## How to Build This Package (on Developer Machine)
+## How to Build This Package (on Developer Machine or Offline Build Server)
 
-Run these steps on your development machine before handing off:
+Run these steps on your development or build machine. The project is specifically configured for **offline-safe builds** and utilizes a Webpack-based engine to bypass all Vite-related vulnerability and registry issues.
 
 ```powershell
 $target = "Shell-Gems-Portable\Shell-Gems-Native"
@@ -76,18 +76,19 @@ $target = "Shell-Gems-Portable\Shell-Gems-Native"
 dotnet publish host\ShellGems.Host.csproj -c Release -o "$target"
 
 # Step 2 — Build Angular renderer
+# Note: Project uses local overrides for 'vite' dependencies located in renderer/local-packages/
 Push-Location renderer
-npm install
-npm run build
+npm install            # Works offline due to local package overrides
+npm run build          # Compiles UI via Webpack (Vite is completely bypassed)
 Pop-Location
 Copy-Item -Path "renderer\dist" -Destination "$target\renderer\dist" -Recurse -Force
 
 # Step 3 — Compile Plugins
 dotnet publish MockPlugin\MockPlugin.csproj -c Release
-Copy-Item "MockPlugin\bin\Release\net6.0\publish\mock-plugin.dll" "$target\plugins\dlls\" -Force
+Copy-Item "MockPlugin\bin\Release\net8.0\publish\mock-plugin.dll" "$target\plugins\dlls\" -Force
 
 dotnet publish ChargingMockPlugin\ChargingMockPlugin.csproj -c Release
-Copy-Item "ChargingMockPlugin\bin\Release\net6.0\publish\charging-plugin.dll" "$target\plugins\dlls\" -Force
+Copy-Item "ChargingMockPlugin\bin\Release\net8.0\publish\charging-plugin.dll" "$target\plugins\dlls\" -Force
 ```
 
 ---

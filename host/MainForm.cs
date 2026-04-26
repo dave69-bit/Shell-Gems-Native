@@ -28,11 +28,24 @@ namespace ShellGems.Host
             await webView.EnsureCoreWebView2Async(null);
 
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var rendererDir = Path.Combine(baseDir, "renderer", "dist", "renderer", "browser");
+            // 1. Check for the portable build structure (renderer/dist)
+            var rendererDir = Path.Combine(baseDir, "renderer", "dist");
             
             if (!Directory.Exists(rendererDir))
             {
-                rendererDir = Path.Combine(baseDir, "..", "..", "..", "..", "renderer", "dist", "renderer", "browser");
+                // 2. Check for development structure (up several directories from output folder)
+                rendererDir = Path.Combine(baseDir, "..", "..", "..", "..", "renderer", "dist", "renderer");
+            }
+            
+            if (!Directory.Exists(rendererDir))
+            {
+                // 3. Last attempt — same level as host
+                rendererDir = Path.Combine(baseDir, "..", "renderer", "dist");
+            }
+
+            if (!Directory.Exists(rendererDir))
+            {
+                throw new DirectoryNotFoundException($"Could not find the UI content directory at: {rendererDir}");
             }
 
             webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
