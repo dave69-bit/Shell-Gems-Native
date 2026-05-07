@@ -48,6 +48,8 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
-    "typescript": "~5.4.2"
+    "typescript": "~5.4.2",
+    "vite": "file:./local-packages/vite-noop",
+    "@vitejs/plugin-basic-ssl": "file:./local-packages/vite-noop"
   }
 }
